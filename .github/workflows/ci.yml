@@ -69,8 +69,9 @@ jobs:
       - run: go test ./... -race -count=1
 
   integration:
+    name: Integration (Docker)
     runs-on: ubuntu-latest
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'integration') || github.event_name == 'push' }}
+    needs: [test]
     env:
       ROCKY_HEARTH_INTEGRATION: "1"
     steps:
@@ -82,13 +83,9 @@ jobs:
       - name: Authenticate to rocky-hq private Go modules
         run: |
           git config --global url."https://x-access-token:${{ secrets.ROCKY_HQ_RO_TOKEN }}@github.com/rocky-hq/".insteadOf "https://github.com/rocky-hq/"
-      # Phase 5a: integration suite is a stub (no test/integration/ files yet).
-      # The job exists so 5c's PR adds tests under test/integration/ without
-      # also having to wire CI.
-      - name: "integration tests (Phase 5a: stub)"
-        run: |
-          if [ -d test/integration ]; then
-            go test ./test/integration/... -race -count=1
-          else
-            echo "No test/integration/ yet — Phase 5c lands the LocalDocker tests."
-          fi
+      - name: Verify Docker daemon
+        run: docker version
+      - name: Pre-pull nginx:alpine
+        run: docker pull nginx:alpine
+      - name: Run integration tests
+        run: go test ./test/integration/... -race -count=1 -v

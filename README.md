@@ -2,7 +2,23 @@
 
 Per-workspace CAIRNET+LORE provisioner for the [Rocky](https://github.com/rocky-hq) superproject.
 
-> **Status:** Phase 5a — scaffold only. The `Driver` interface and `FakeDriver` are in place; the `LocalDocker` driver lands in Phase 5c.
+> **Status:** Phase 5c — `LocalDocker` driver + JSON-over-HTTP RPC. The `Driver` interface, `FakeDriver`, and `LocalDocker` are in place; `Kustomize` and `DevarnoCloud` land in Phases 6a/6b.
+
+## Running locally
+
+The `hearth` binary at [`cmd/hearth/main.go`](./cmd/hearth/main.go) is the
+operator entrypoint. It exposes the four `Driver` verbs as JSON-over-HTTP
+on a Unix socket (mode 0600).
+
+```bash
+go build -o /tmp/hearth ./cmd/hearth
+ROCKY_HEARTH_DRIVER=fake ROCKY_HEARTH_SOCKET=/tmp/h.sock /tmp/hearth &
+curl --unix-socket /tmp/h.sock http://x/v1/healthz   # -> {"ok":true}
+```
+
+Env knobs (`ROCKY_HEARTH_DRIVER`, `ROCKY_HEARTH_SOCKET`, `DOCKER_HOST`,
+`ROCKY_HEARTH_IMAGE_CAIRNET`, `ROCKY_HEARTH_IMAGE_LORE`) are documented
+in [`CLAUDE.md`](./CLAUDE.md#running-locally-phase-5c).
 
 ## Quickstart
 

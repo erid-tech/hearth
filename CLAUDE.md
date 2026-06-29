@@ -64,6 +64,32 @@ defined in this repo. They are generated from the zod source in
 
 Never edit `internal/driver/types.go` to introduce a new shape.
 
+## Running locally (Phase 5c)
+
+The `hearth` binary at `cmd/hearth/main.go` is the operator entrypoint.
+It exposes the four `Driver` verbs as JSON-over-HTTP on a Unix socket.
+
+Env knobs:
+
+| Var | Default | Notes |
+|---|---|---|
+| `ROCKY_HEARTH_DRIVER` | `local-docker` | Also accepts `fake` for smoke tests. |
+| `ROCKY_HEARTH_SOCKET` | `/var/run/rocky-hearth.sock` | Mode 0600. Removed on clean exit. |
+| `DOCKER_HOST` | (docker SDK default) | Passed through to the docker client. |
+| `ROCKY_HEARTH_IMAGE_CAIRNET` | `nginx:alpine` | Stand-in until CAIRNET image ships. |
+| `ROCKY_HEARTH_IMAGE_LORE` | `nginx:alpine` | Stand-in until LORE image ships. |
+
+Quick smoke test:
+
+```bash
+go build -o /tmp/hearth ./cmd/hearth
+ROCKY_HEARTH_DRIVER=fake ROCKY_HEARTH_SOCKET=/tmp/h.sock /tmp/hearth &
+curl --unix-socket /tmp/h.sock http://x/v1/healthz   # -> {"ok":true}
+```
+
+Auth in 5c is filesystem permissions on the socket. TCP transport with
+bearer tokens lands in Phase 6.
+
 ## CI secret: `ROCKY_HQ_RO_TOKEN`
 
 `rocky-hq/contracts` is a private repo. The `lint`, `test`, and `integration`
