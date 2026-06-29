@@ -42,7 +42,9 @@ func Listen(ctx context.Context, socketPath string, handler http.Handler) error 
 	case <-ctx.Done():
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutCtx)
+		if err := srv.Shutdown(shutCtx); err != nil {
+			_ = err // best-effort shutdown
+		}
 		_ = os.Remove(socketPath)
 		return nil
 	}

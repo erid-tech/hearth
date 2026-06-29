@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -42,7 +41,6 @@ func newFakeAPI() *fakeAPI {
 
 func (f *fakeAPI) hasNetwork(name string) bool   { _, ok := f.networks[name]; return ok }
 func (f *fakeAPI) hasContainer(name string) bool { _, ok := f.containers[name]; return ok }
-func (f *fakeAPI) hasVolume(name string) bool    { _, ok := f.volumes[name]; return ok }
 
 func (f *fakeAPI) ContainerCreate(_ context.Context, config *container.Config, _ *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, name string) (container.CreateResponse, error) {
 	f.containerCreateCalls++
@@ -70,9 +68,9 @@ func (f *fakeAPI) ContainerStart(_ context.Context, id string, _ container.Start
 	return errors.New("not found")
 }
 
-func (f *fakeAPI) ContainerInspect(_ context.Context, id string) (types.ContainerJSON, error) {
+func (f *fakeAPI) ContainerInspect(_ context.Context, id string) (container.InspectResponse, error) {
 	if f.failContainerInspect {
-		return types.ContainerJSON{}, errors.New("synthetic inspect failure")
+		return container.InspectResponse{}, errors.New("synthetic inspect failure")
 	}
 	for _, c := range f.containers {
 		if c.id == id || c.name == strings.TrimPrefix(id, "/") {
@@ -80,17 +78,17 @@ func (f *fakeAPI) ContainerInspect(_ context.Context, id string) (types.Containe
 			if c.running {
 				state = "running"
 			}
-			return types.ContainerJSON{
-				ContainerJSONBase: &types.ContainerJSONBase{
+			return container.InspectResponse{
+				ContainerJSONBase: &container.ContainerJSONBase{
 					ID:    c.id,
 					Name:  "/" + c.name,
-					State: &types.ContainerState{Status: state, ExitCode: c.exitCode},
+					State: &container.State{Status: state, ExitCode: c.exitCode},
 				},
 				Config: &container.Config{Labels: c.labels},
 			}, nil
 		}
 	}
-	return types.ContainerJSON{}, errors.New("not found")
+	return container.InspectResponse{}, errors.New("not found")
 }
 
 func (f *fakeAPI) ContainerRemove(_ context.Context, id string, _ container.RemoveOptions) error {
@@ -103,12 +101,12 @@ func (f *fakeAPI) ContainerRemove(_ context.Context, id string, _ container.Remo
 	return nil
 }
 
-func (f *fakeAPI) ContainerList(_ context.Context, opts container.ListOptions) ([]types.Container, error) {
+func (f *fakeAPI) ContainerList(_ context.Context, opts container.ListOptions) ([]container.Summary, error) {
 	want := opts.Filters.Get("label")
-	out := []types.Container{}
+	out := []container.Summary{}
 	for _, c := range f.containers {
 		if matchLabels(c.labels, want) {
-			out = append(out, types.Container{ID: c.id, Names: []string{"/" + c.name}, Labels: c.labels})
+			out = append(out, container.Summary{ID: c.id, Names: []string{"/" + c.name}, Labels: c.labels})
 		}
 	}
 	return out, nil

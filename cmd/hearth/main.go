@@ -75,6 +75,9 @@ func envDefault(key, def string) string {
 func emitLog(event string, fields map[string]any) {
 	fields["event"] = event
 	fields["binary"] = "hearth"
-	out, _ := json.Marshal(fields)
+	out, err := json.Marshal(fields)
+	if err != nil {
+		return
+	}
 	fmt.Fprintln(os.Stdout, string(out))
 }

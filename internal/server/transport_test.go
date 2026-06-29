@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -39,7 +40,11 @@ func TestListenServesAndShutsDown(t *testing.T) {
 			return net.Dial("unix", sockPath)
 		},
 	}}
-	resp, err := client.Get("http://unix/ping")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://unix/ping", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -53,7 +58,7 @@ func TestListenServesAndShutsDown(t *testing.T) {
 	cancel()
 	select {
 	case err := <-errCh:
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			t.Errorf("Listen returned %v", err)
 		}
 	case <-time.After(6 * time.Second):

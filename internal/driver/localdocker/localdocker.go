@@ -82,26 +82,56 @@ func (d *Driver) Provision(ctx context.Context, slug string, profile driver.Prov
 		return ref, nil
 	}
 
-	rollback := func() {
-		bgctx := context.Background()
-		summaries, _ := d.api.ContainerList(bgctx, container.ListOptions{All: true, Filters: workspaceFilter(slug)})
-		for _, s := range summaries {
-			_ = d.api.ContainerRemove(bgctx, s.ID, container.RemoveOptions{Force: true})
-		}
-		_ = d.api.NetworkRemove(bgctx, networkName(slug))
-		_ = d.api.VolumeRemove(bgctx, volumeName(slug, RoleCairnet), true)
-		_ = d.api.VolumeRemove(bgctx, volumeName(slug, RoleLore), true)
+	rollback := func() { d.rollbackWorkspace(slug) }
+
+	if err := d.createNetwork(ctx, slug, profile); err != nil {
+		return driver.DeploymentRef{}, err
+	}
+	if err := d.createWorkspaceContainers(ctx, slug, profile, rollback); err != nil {
+		return driver.DeploymentRef{}, err
 	}
 
+	ref := d.refFor(slug, profile, driver.StatusReady)
+	if fresh, err := d.lookupContainers(ctx, slug); err == nil {
+		ref.Created = d.cairnetCreated(ctx, fresh)
+	}
+	return ref, nil
+}
+
+// rollbackWorkspace removes every container, network, and volume associated
+// with slug on a best-effort basis using a background context, so cleanup
+// completes even if the caller's ctx is already canceled.
+func (d *Driver) rollbackWorkspace(slug string) {
+	bgctx := context.Background()
+	if summaries, listErr := d.api.ContainerList(bgctx, container.ListOptions{All: true, Filters: workspaceFilter(slug)}); listErr == nil {
+		for _, s := range summaries {
+			if rmErr := d.api.ContainerRemove(bgctx, s.ID, container.RemoveOptions{Force: true}); rmErr != nil {
+				continue // best-effort rollback
+			}
+		}
+	}
+	if netErr := d.api.NetworkRemove(bgctx, networkName(slug)); netErr != nil {
+		_ = netErr // best-effort rollback
+	}
+	if volErr := d.api.VolumeRemove(bgctx, volumeName(slug, RoleCairnet), true); volErr != nil {
+		_ = volErr
+	}
+	if volErr := d.api.VolumeRemove(bgctx, volumeName(slug, RoleLore), true); volErr != nil {
+		_ = volErr
+	}
+}
+
+// createNetwork creates the per-workspace bridge network and per-role volumes.
+// Volume failures trigger an immediate rollback of any work done so far.
+func (d *Driver) createNetwork(ctx context.Context, slug string, profile driver.ProvisioningProfile) error {
 	netLabels := roleLabels(slug, RoleNetwork)
 	netLabels[LabelTier] = string(profile.Tier)
 	if _, err := d.api.NetworkCreate(ctx, networkName(slug), network.CreateOptions{
 		Driver: "bridge",
 		Labels: netLabels,
 	}); err != nil {
-		return driver.DeploymentRef{}, fmt.Errorf("network create: %w", err)
+		return fmt.Errorf("network create: %w", err)
 	}
-
 	for _, role := range []string{RoleCairnet, RoleLore} {
 		labels := roleLabels(slug, role)
 		labels[LabelTier] = string(profile.Tier)
@@ -109,25 +139,19 @@ func (d *Driver) Provision(ctx context.Context, slug string, profile driver.Prov
 			Name:   volumeName(slug, role),
 			Labels: labels,
 		}); err != nil {
-			rollback()
-			return driver.DeploymentRef{}, fmt.Errorf("volume create %s: %w", role, err)
+			d.rollbackWorkspace(slug)
+			return fmt.Errorf("volume create %s: %w", role, err)
 		}
 	}
+	return nil
+}
 
+// createWorkspaceContainers pulls each role image (best-effort), creates the
+// container, and starts it. Any failure triggers rollback before returning.
+func (d *Driver) createWorkspaceContainers(ctx context.Context, slug string, profile driver.ProvisioningProfile, rollback func()) error {
 	for _, role := range []string{RoleCairnet, RoleLore} {
-		img := d.imgs.cairnet
-		flagKey := "cairnet_image"
-		if role == RoleLore {
-			img = d.imgs.lore
-			flagKey = "lore_image"
-		}
-		if v, ok := profile.DriverFlags[flagKey].(string); ok && v != "" {
-			img = v
-		}
-		if rc, err := d.api.ImagePull(ctx, img, image.PullOptions{}); err == nil {
-			_, _ = io.Copy(io.Discard, rc)
-			_ = rc.Close()
-		}
+		img := d.imageFor(role, profile)
+		d.pullImage(ctx, img)
 		labels := roleLabels(slug, role)
 		labels[LabelTier] = string(profile.Tier)
 		resp, err := d.api.ContainerCreate(ctx, &container.Config{
@@ -148,19 +172,43 @@ func (d *Driver) Provision(ctx context.Context, slug string, profile driver.Prov
 		}, nil, containerName(slug, role))
 		if err != nil {
 			rollback()
-			return driver.DeploymentRef{}, fmt.Errorf("container create %s: %w", role, err)
+			return fmt.Errorf("container create %s: %w", role, err)
 		}
 		if err := d.api.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 			rollback()
-			return driver.DeploymentRef{}, fmt.Errorf("container start %s: %w", role, err)
+			return fmt.Errorf("container start %s: %w", role, err)
 		}
 	}
+	return nil
+}
 
-	ref := d.refFor(slug, profile, driver.StatusReady)
-	if fresh, err := d.lookupContainers(ctx, slug); err == nil {
-		ref.Created = d.cairnetCreated(ctx, fresh)
+// imageFor returns the image reference for a role, honoring DriverFlags overrides.
+func (d *Driver) imageFor(role string, profile driver.ProvisioningProfile) string {
+	img := d.imgs.cairnet
+	flagKey := "cairnet_image"
+	if role == RoleLore {
+		img = d.imgs.lore
+		flagKey = "lore_image"
 	}
-	return ref, nil
+	if v, ok := profile.DriverFlags[flagKey].(string); ok && v != "" {
+		img = v
+	}
+	return img
+}
+
+// pullImage drains and closes the image-pull stream. Failures are intentionally
+// ignored: pre-existing local images make ImagePull non-fatal.
+func (d *Driver) pullImage(ctx context.Context, img string) {
+	rc, err := d.api.ImagePull(ctx, img, image.PullOptions{})
+	if err != nil {
+		return
+	}
+	if _, copyErr := io.Copy(io.Discard, rc); copyErr != nil {
+		_ = copyErr // best-effort drain
+	}
+	if closeErr := rc.Close(); closeErr != nil {
+		_ = closeErr // best-effort close
+	}
 }
 
 // cairnetCreated returns the canonical Created timestamp for a deployment:
@@ -262,28 +310,19 @@ func (d *Driver) Upgrade(ctx context.Context, ref driver.DeploymentRef, profile 
 		return driver.DeploymentRef{}, err
 	}
 	for _, c := range containers {
-		if err := ctx.Err(); err != nil {
-			return driver.DeploymentRef{}, err
+		if cerr := ctx.Err(); cerr != nil {
+			return driver.DeploymentRef{}, cerr
 		}
-		_ = d.api.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true})
+		if rmErr := d.api.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); rmErr != nil {
+			_ = rmErr // best-effort remove
+		}
 	}
 	for _, role := range []string{RoleCairnet, RoleLore} {
-		if err := ctx.Err(); err != nil {
-			return driver.DeploymentRef{}, err
+		if cerr := ctx.Err(); cerr != nil {
+			return driver.DeploymentRef{}, cerr
 		}
-		img := d.imgs.cairnet
-		flagKey := "cairnet_image"
-		if role == RoleLore {
-			img = d.imgs.lore
-			flagKey = "lore_image"
-		}
-		if v, ok := profile.DriverFlags[flagKey].(string); ok && v != "" {
-			img = v
-		}
-		if rc, err := d.api.ImagePull(ctx, img, image.PullOptions{}); err == nil {
-			_, _ = io.Copy(io.Discard, rc)
-			_ = rc.Close()
-		}
+		img := d.imageFor(role, profile)
+		d.pullImage(ctx, img)
 		labels := roleLabels(ref.WorkspaceSlug, role)
 		labels[LabelTier] = string(profile.Tier)
 		resp, err := d.api.ContainerCreate(ctx, &container.Config{Image: img, Labels: labels}, &container.HostConfig{}, &network.NetworkingConfig{
@@ -309,38 +348,62 @@ func (d *Driver) Teardown(ctx context.Context, ref driver.DeploymentRef) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	containers, err := d.lookupContainers(ctx, ref.WorkspaceSlug)
+	if err := d.teardownContainers(ctx, ref.WorkspaceSlug); err != nil {
+		return err
+	}
+	if err := d.teardownNetworks(ctx, ref.WorkspaceSlug); err != nil {
+		return err
+	}
+	return d.teardownVolumes(ctx, ref.WorkspaceSlug)
+}
+
+func (d *Driver) teardownContainers(ctx context.Context, slug string) error {
+	containers, err := d.lookupContainers(ctx, slug)
 	if err != nil {
 		return err
 	}
 	for _, c := range containers {
-		if err := ctx.Err(); err != nil {
-			return err
+		if cerr := ctx.Err(); cerr != nil {
+			return cerr
 		}
-		_ = d.api.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true, RemoveVolumes: false})
+		if rmErr := d.api.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true, RemoveVolumes: false}); rmErr != nil {
+			_ = rmErr // best-effort teardown
+		}
 	}
-	if err := ctx.Err(); err != nil {
-		return err
+	return nil
+}
+
+func (d *Driver) teardownNetworks(ctx context.Context, slug string) error {
+	if cerr := ctx.Err(); cerr != nil {
+		return cerr
 	}
-	nets, err := d.api.NetworkList(ctx, network.ListOptions{Filters: workspaceFilter(ref.WorkspaceSlug)})
+	nets, err := d.api.NetworkList(ctx, network.ListOptions{Filters: workspaceFilter(slug)})
 	if err == nil {
 		for _, n := range nets {
-			if err := ctx.Err(); err != nil {
-				return err
+			if cerr := ctx.Err(); cerr != nil {
+				return cerr
 			}
-			_ = d.api.NetworkRemove(ctx, n.ID)
+			if rmErr := d.api.NetworkRemove(ctx, n.ID); rmErr != nil {
+				_ = rmErr
+			}
 		}
 	}
-	if err := ctx.Err(); err != nil {
-		return err
+	return nil
+}
+
+func (d *Driver) teardownVolumes(ctx context.Context, slug string) error {
+	if cerr := ctx.Err(); cerr != nil {
+		return cerr
 	}
-	vols, err := d.api.VolumeList(ctx, volume.ListOptions{Filters: workspaceFilter(ref.WorkspaceSlug)})
+	vols, err := d.api.VolumeList(ctx, volume.ListOptions{Filters: workspaceFilter(slug)})
 	if err == nil {
 		for _, v := range vols.Volumes {
-			if err := ctx.Err(); err != nil {
-				return err
+			if cerr := ctx.Err(); cerr != nil {
+				return cerr
 			}
-			_ = d.api.VolumeRemove(ctx, v.Name, true)
+			if rmErr := d.api.VolumeRemove(ctx, v.Name, true); rmErr != nil {
+				_ = rmErr
+			}
 		}
 	}
 	return nil

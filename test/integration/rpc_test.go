@@ -89,7 +89,12 @@ func TestRPCEndToEnd(t *testing.T) {
 		if err != nil {
 			t.Fatalf("marshal %s: %v", path, err)
 		}
-		resp, err := client.Post("http://unix"+path, "application/json", bytes.NewReader(buf))
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://unix"+path, bytes.NewReader(buf))
+		if err != nil {
+			t.Fatalf("new request %s: %v", path, err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatalf("POST %s: %v", path, err)
 		}

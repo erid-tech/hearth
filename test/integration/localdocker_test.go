@@ -120,7 +120,7 @@ func TestLocalDockerE2E(t *testing.T) {
 		t.Errorf("post-Teardown Status = %q, want %q", post, driver.StatusTierTornDown)
 	}
 
-	// Teardown leaves nothing labelled with this slug.
+	// Teardown leaves nothing labeled with this slug.
 	remaining, err := cli.ContainerList(ctx, container.ListOptions{
 		All:     true,
 		Filters: localdocker.WorkspaceFilterForTests(s),

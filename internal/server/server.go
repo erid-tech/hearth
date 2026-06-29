@@ -117,7 +117,9 @@ func (s *Server) handleTeardown(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, code int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(body)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		_ = err // header + status already flushed; nothing actionable left
+	}
 }
 
 func writeError(w http.ResponseWriter, code int, errCode, msg string, retryable bool) {
