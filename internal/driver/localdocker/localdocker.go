@@ -77,7 +77,9 @@ func (d *Driver) Provision(ctx context.Context, slug string, profile driver.Prov
 				return driver.DeploymentRef{}, fmt.Errorf("%w: existing=%s requested=%s", ErrTierMismatch, got, profile.Tier)
 			}
 		}
-		return d.refFor(slug, profile, driver.StatusReady), nil
+		ref := d.refFor(slug, profile, driver.StatusReady)
+		ref.Created = d.cairnetCreated(ctx, existing)
+		return ref, nil
 	}
 
 	rollback := func() {
@@ -154,7 +156,32 @@ func (d *Driver) Provision(ctx context.Context, slug string, profile driver.Prov
 		}
 	}
 
-	return d.refFor(slug, profile, driver.StatusReady), nil
+	ref := d.refFor(slug, profile, driver.StatusReady)
+	if fresh, err := d.lookupContainers(ctx, slug); err == nil {
+		ref.Created = d.cairnetCreated(ctx, fresh)
+	}
+	return ref, nil
+}
+
+// cairnetCreated returns the canonical Created timestamp for a deployment:
+// the cairnet container's inspect.Created. Falls back to d.now() if no
+// cairnet container is present (e.g. mid-Provision lookup races) or if
+// inspect/parse fails. This keeps DeploymentRef.Created stable across
+// idempotent re-Provisions instead of advancing on every call.
+func (d *Driver) cairnetCreated(ctx context.Context, summaries []containerSummary) time.Time {
+	for _, c := range summaries {
+		if c.Labels[LabelRole] != RoleCairnet {
+			continue
+		}
+		inspect, err := d.api.ContainerInspect(ctx, c.ID)
+		if err == nil && inspect.ContainerJSONBase != nil && inspect.Created != "" {
+			if t, perr := time.Parse(time.RFC3339Nano, inspect.Created); perr == nil {
+				return t
+			}
+		}
+		break
+	}
+	return d.now()
 }
 
 func (d *Driver) lookupContainers(ctx context.Context, slug string) ([]containerSummary, error) {

@@ -70,14 +70,11 @@ func TestLocalDockerE2E(t *testing.T) {
 	if err != nil {
 		t.Fatalf("idempotent Provision: %v", err)
 	}
-	// Compare structural fields only — Created is sourced from the
-	// driver clock on each call and is allowed to advance.
-	if ref2.WorkspaceSlug != ref.WorkspaceSlug ||
-		ref2.Driver != ref.Driver ||
-		ref2.Tier != ref.Tier ||
-		ref2.LastStatus != ref.LastStatus ||
-		ref2.Endpoint != ref.Endpoint ||
-		ref2.SecretsVaultPath != ref.SecretsVaultPath {
+	// Full ref identity — idempotent Provision reads Created from the
+	// existing cairnet container's inspect, so every field is stable
+	// across calls. Drift in Created indicates the idempotence path
+	// regressed back to d.now().
+	if ref2 != ref {
 		t.Errorf("idempotent Provision ref drift:\n got  %+v\n want %+v", ref2, ref)
 	}
 	after, err := cli.ContainerList(ctx, container.ListOptions{
