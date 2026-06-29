@@ -177,6 +177,148 @@ type containerSummary struct {
 	Labels map[string]string
 }
 
+// Status aggregates the per-container daemon state for a workspace into a
+// single Status value. Absent containers map to StatusTierTornDown so the
+// post-Teardown read returns the D8-required terminal state.
+func (d *Driver) Status(ctx context.Context, ref driver.DeploymentRef) (driver.Status, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	containers, err := d.lookupContainers(ctx, ref.WorkspaceSlug)
+	if err != nil {
+		return "", err
+	}
+	if len(containers) == 0 {
+		return driver.StatusTierTornDown, nil
+	}
+	running := 0
+	for _, c := range containers {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		inspect, err := d.api.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			continue
+		}
+		if inspect.ContainerJSONBase == nil || inspect.State == nil {
+			continue
+		}
+		switch inspect.State.Status {
+		case "removing":
+			return driver.StatusTearingDown, nil
+		case "created", "restarting":
+			return driver.StatusProvisioning, nil
+		case "exited", "dead":
+			if inspect.State.ExitCode != 0 {
+				return driver.StatusFailed, nil
+			}
+		case "running":
+			running++
+		}
+	}
+	if running == len(containers) {
+		return driver.StatusReady, nil
+	}
+	return driver.StatusProvisioning, nil
+}
+
+// Upgrade re-pulls the role images (honoring DriverFlags overrides) and
+// recreates the CAIRNET+LORE containers. Volumes and the shared network are
+// preserved across the call. The returned DeploymentRef keeps the original
+// WorkspaceSlug and provisioning timestamp.
+func (d *Driver) Upgrade(ctx context.Context, ref driver.DeploymentRef, profile driver.ProvisioningProfile) (driver.DeploymentRef, error) {
+	if err := ctx.Err(); err != nil {
+		return driver.DeploymentRef{}, err
+	}
+	containers, err := d.lookupContainers(ctx, ref.WorkspaceSlug)
+	if err != nil {
+		return driver.DeploymentRef{}, err
+	}
+	for _, c := range containers {
+		if err := ctx.Err(); err != nil {
+			return driver.DeploymentRef{}, err
+		}
+		_ = d.api.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true})
+	}
+	for _, role := range []string{RoleCairnet, RoleLore} {
+		if err := ctx.Err(); err != nil {
+			return driver.DeploymentRef{}, err
+		}
+		img := d.imgs.cairnet
+		flagKey := "cairnet_image"
+		if role == RoleLore {
+			img = d.imgs.lore
+			flagKey = "lore_image"
+		}
+		if v, ok := profile.DriverFlags[flagKey].(string); ok && v != "" {
+			img = v
+		}
+		if rc, err := d.api.ImagePull(ctx, img, image.PullOptions{}); err == nil {
+			_, _ = io.Copy(io.Discard, rc)
+			_ = rc.Close()
+		}
+		labels := roleLabels(ref.WorkspaceSlug, role)
+		labels[LabelTier] = string(profile.Tier)
+		resp, err := d.api.ContainerCreate(ctx, &container.Config{Image: img, Labels: labels}, &container.HostConfig{}, &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{networkName(ref.WorkspaceSlug): {}},
+		}, nil, containerName(ref.WorkspaceSlug, role))
+		if err != nil {
+			return driver.DeploymentRef{}, fmt.Errorf("upgrade container create %s: %w", role, err)
+		}
+		if err := d.api.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+			return driver.DeploymentRef{}, fmt.Errorf("upgrade container start %s: %w", role, err)
+		}
+	}
+	out := d.refFor(ref.WorkspaceSlug, profile, driver.StatusReady)
+	out.Created = ref.Created
+	return out, nil
+}
+
+// Teardown removes every resource labeled for the workspace: containers
+// first, then the network, then volumes (D8 invariant — clean slate). The
+// call is idempotent: missing resources are not an error, and a second
+// invocation succeeds with nothing left to remove.
+func (d *Driver) Teardown(ctx context.Context, ref driver.DeploymentRef) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	containers, err := d.lookupContainers(ctx, ref.WorkspaceSlug)
+	if err != nil {
+		return err
+	}
+	for _, c := range containers {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		_ = d.api.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true, RemoveVolumes: false})
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	nets, err := d.api.NetworkList(ctx, network.ListOptions{Filters: workspaceFilter(ref.WorkspaceSlug)})
+	if err == nil {
+		for _, n := range nets {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			_ = d.api.NetworkRemove(ctx, n.ID)
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	vols, err := d.api.VolumeList(ctx, volume.ListOptions{Filters: workspaceFilter(ref.WorkspaceSlug)})
+	if err == nil {
+		for _, v := range vols.Volumes {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			_ = d.api.VolumeRemove(ctx, v.Name, true)
+		}
+	}
+	return nil
+}
+
 func (d *Driver) refFor(slug string, profile driver.ProvisioningProfile, status driver.Status) driver.DeploymentRef {
 	return driver.DeploymentRef{
 		WorkspaceSlug:    slug,

@@ -115,6 +115,100 @@ func TestProvisionRollsBackOnFailure(t *testing.T) {
 	}
 }
 
+func TestStatusReadyWhenBothRunning(t *testing.T) {
+	api := newFakeAPI()
+	d := newTestDriver(t, api)
+	ref, err := d.Provision(context.Background(), "alex-solo", soloProfile())
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+	got, err := d.Status(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if got != driver.StatusReady {
+		t.Errorf("Status = %q, want ready", got)
+	}
+}
+
+func TestStatusTornDownWhenAbsent(t *testing.T) {
+	api := newFakeAPI()
+	d := newTestDriver(t, api)
+	ref := driver.DeploymentRef{WorkspaceSlug: "ghost", Tier: driver.TierSolo, Driver: driver.DriverLocalDocker}
+	got, err := d.Status(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if got != driver.StatusTierTornDown {
+		t.Errorf("Status = %q, want tier_torn_down", got)
+	}
+}
+
+func TestStatusFailedWhenContainerExitedNonzero(t *testing.T) {
+	api := newFakeAPI()
+	d := newTestDriver(t, api)
+	ref, _ := d.Provision(context.Background(), "alex-solo", soloProfile())
+	api.containers["rocky-hearth_alex-solo_cairnet"].running = false
+	api.containers["rocky-hearth_alex-solo_cairnet"].exitCode = 137
+	got, err := d.Status(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if got != driver.StatusFailed {
+		t.Errorf("Status = %q, want failed", got)
+	}
+}
+
+func TestUpgradePreservesVolumes(t *testing.T) {
+	api := newFakeAPI()
+	d := newTestDriver(t, api)
+	ref, _ := d.Provision(context.Background(), "alex-solo", soloProfile())
+	preVolumes := len(api.volumes)
+	newProfile := soloProfile()
+	newProfile.DriverFlags["cairnet_image"] = "nginx:1.25-alpine"
+	got, err := d.Upgrade(context.Background(), ref, newProfile)
+	if err != nil {
+		t.Fatalf("Upgrade: %v", err)
+	}
+	if got.WorkspaceSlug != ref.WorkspaceSlug {
+		t.Errorf("Upgrade dropped WorkspaceSlug")
+	}
+	if len(api.volumes) != preVolumes {
+		t.Errorf("Upgrade changed volume count: %d -> %d", preVolumes, len(api.volumes))
+	}
+	if api.containers["rocky-hearth_alex-solo_cairnet"] == nil {
+		t.Errorf("Upgrade did not recreate CAIRNET")
+	}
+}
+
+func TestTeardownIsTerminal(t *testing.T) {
+	api := newFakeAPI()
+	d := newTestDriver(t, api)
+	ref, _ := d.Provision(context.Background(), "alex-solo", soloProfile())
+	if err := d.Teardown(context.Background(), ref); err != nil {
+		t.Fatalf("Teardown: %v", err)
+	}
+	if len(api.containers) != 0 || len(api.networks) != 0 || len(api.volumes) != 0 {
+		t.Errorf("Teardown left resources: containers=%d networks=%d volumes=%d", len(api.containers), len(api.networks), len(api.volumes))
+	}
+	got, _ := d.Status(context.Background(), ref)
+	if got != driver.StatusTierTornDown {
+		t.Errorf("post-Teardown Status = %q, want tier_torn_down", got)
+	}
+}
+
+func TestTeardownIsIdempotent(t *testing.T) {
+	api := newFakeAPI()
+	d := newTestDriver(t, api)
+	ref, _ := d.Provision(context.Background(), "alex-solo", soloProfile())
+	if err := d.Teardown(context.Background(), ref); err != nil {
+		t.Fatalf("first Teardown: %v", err)
+	}
+	if err := d.Teardown(context.Background(), ref); err != nil {
+		t.Errorf("second Teardown: %v", err)
+	}
+}
+
 func TestProvisionHonorsContext(t *testing.T) {
 	api := newFakeAPI()
 	d := newTestDriver(t, api)
