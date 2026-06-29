@@ -6,6 +6,10 @@ const (
 	LabelManagedBy = "rocky-hq.io/managed-by"
 	LabelWorkspace = "rocky-hq.io/workspace"
 	LabelRole      = "rocky-hq.io/role"
+	// LabelTier records the deployment tier on every managed resource so we
+	// can detect a tier mismatch on idempotent Provision calls and force the
+	// caller to invoke Upgrade explicitly.
+	LabelTier = "rocky-hq.io/tier"
 
 	ManagedByValue = "hearth"
 

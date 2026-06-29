@@ -15,11 +15,6 @@ import (
 	"github.com/rocky-hq/hearth/internal/driver"
 )
 
-// LabelTier records the deployment tier on every managed resource so we can
-// detect a tier mismatch on idempotent Provision calls and force the caller
-// to invoke Upgrade explicitly.
-const LabelTier = "rocky-hq.io/tier"
-
 // ErrTierMismatch is returned when Provision is called for a workspace
 // that already has resources labeled with a different tier. Callers
 // must invoke Upgrade explicitly.
