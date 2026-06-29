@@ -38,3 +38,10 @@ func workspaceFilter(slug string) filters.Args {
 	args.Add("label", LabelWorkspace+"="+slug)
 	return args
 }
+
+// WorkspaceFilterForTests exposes workspaceFilter to the integration
+// test package so it can label-sweep leftover resources. Not for
+// production use.
+func WorkspaceFilterForTests(slug string) filters.Args {
+	return workspaceFilter(slug)
+}
