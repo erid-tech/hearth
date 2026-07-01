@@ -90,6 +90,27 @@ curl --unix-socket /tmp/h.sock http://x/v1/healthz   # -> {"ok":true}
 Auth in 5c is filesystem permissions on the socket. TCP transport with
 bearer tokens lands in Phase 6.
 
+## SS-08 driver agent projection (Phase 7b)
+
+The RPC server (`internal/server/server.go`) emits `agent.{registered,invoked,completed}` per
+`agent-registration.v1` (contracts `>=0.3.0`, subpath `github.com/rocky-hq/contracts/go/agent`)
+per RPC verb call. Builders live in `internal/agent/`; the emitter is
+hearth-native (POSTs to `$HEARTH_AGENT_HATCH_URL`) because the console
+SS-08 wrapper (Phase 5d) that would otherwise own the emit is not built yet.
+
+`agent_id` format: `<workspace_slug>-driver-<driver-name>` (driver-name normalized to `[a-z0-9-]`; e.g. `iris-hq-driver-local-docker`). One agent per `(workspace, driver)` pair. `capabilities = ["driver.provision","driver.status","driver.upgrade","driver.teardown"]` (fixed). Per-invocation `capability = driver.<verb>` (one of the four). `invocation_id = uuid.NewString()` per request. `outcome`: `nil` err → `ok`; error → `error`. `duration_ms` is wall-clock around the driver call. Slug source: `req.Slug` (Provision) or `req.Ref.WorkspaceSlug` (Status/Upgrade/Teardown). Empty slug → zero emission (mirrors the workspace-header gate used by every console-side producer).
+
+Emitter env knobs:
+
+| Var | Default | Notes |
+|---|---|---|
+| `HEARTH_AGENT_HATCH_URL` | *(empty)* | Full URL for `POST /api/relay/agent` on the console host. Empty → `NopEmitter` (no fault). |
+| `HEARTH_AGENT_HATCH_TIMEOUT_MS` | `2000` | Wall-clock cap on each Emit's HTTP round trip. |
+
+Emit is non-blocking (each Emit fires a goroutine bounded by the timeout) and best-effort: transport errors + non-2xx responses log at `slog.Warn` and are dropped. A hatch outage must never fault an RPC. Nop is the default so pre-5d hearth deployments emit nothing until an operator opts in via env.
+
+Phase 5d re-eval: when the console SS-08 wrapper (`console/src/lib/hearth/`) lands, decide whether to also emit console-side (double-emit is idempotent on `agent_id`) or flip a flag to prefer the console emit. Phase 7c hardens the driver `Teardown` verb to `approval.required: true` with `airlock_verb: agent.teardown` — deferred here.
+
 ## CI secret: `ROCKY_HQ_RO_TOKEN`
 
 `rocky-hq/contracts` is a private repo. The `lint`, `test`, and `integration`
