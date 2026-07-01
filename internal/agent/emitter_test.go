@@ -45,8 +45,8 @@ func TestHTTPEmitter_PostsEventJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		defer w.wg.Done()
 		buf, _ := io.ReadAll(r.Body)
-		copy := append([]byte(nil), buf...)
-		w.body.Store(&copy)
+		snap := append([]byte(nil), buf...)
+		w.body.Store(&snap)
 		h := r.Header.Clone()
 		w.hdr.Store(&h)
 		w.code.Store(int32(http.StatusAccepted))
