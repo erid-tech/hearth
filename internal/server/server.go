@@ -128,6 +128,30 @@ func (s *Server) beginInvocation(ctx context.Context, verb agent.Verb, slug stri
 	return inv
 }
 
+// checkGate applies the Phase 7c-c-a gate (approval + entitlement) to
+// an RPC handler's request before any driver call and before any
+// agent.* emit. Returns true when the request may proceed. On denial
+// it writes an ErrorResp with the gate reason and returns false —
+// the handler MUST NOT call the driver or emit any agent event.
+// When slug is empty the gate is skipped (parity with
+// beginInvocation's no-owner ⇒ no-emission rule).
+func (s *Server) checkGate(w http.ResponseWriter, slug string, driverName contractshearth.DriverName) bool {
+	if slug == "" {
+		return true
+	}
+	reg := agent.BuildRegistration(slug, driverName, time.Now().UTC())
+	result := agent.GateInvocation(reg, slug)
+	if !result.Allowed {
+		code := "approval_denied"
+		if result.Status == http.StatusPaymentRequired {
+			code = "entitlement_denied"
+		}
+		writeError(w, result.Status, code, result.Reason, false)
+		return false
+	}
+	return true
+}
+
 // finishInvocation fires agent.completed with the resolved outcome. It
 // is a no-op when inv is nil (slug was empty at begin time).
 func (s *Server) finishInvocation(inv *agentInvocation, err error) {
@@ -163,6 +187,9 @@ func (s *Server) handleProvision(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "invalid_request", err.Error(), false)
 		return
 	}
+	if !s.checkGate(w, req.Slug, req.Profile.Driver) {
+		return
+	}
 	inv := s.beginInvocation(r.Context(), agent.VerbProvision, req.Slug, req.Profile.Driver, req.Slug)
 	ref, err := s.drv.Provision(r.Context(), req.Slug, req.Profile)
 	s.finishInvocation(inv, err)
@@ -177,6 +204,9 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	var req StatusReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, 400, "invalid_request", err.Error(), false)
+		return
+	}
+	if !s.checkGate(w, req.Ref.WorkspaceSlug, req.Ref.Driver) {
 		return
 	}
 	inv := s.beginInvocation(r.Context(), agent.VerbStatus, req.Ref.WorkspaceSlug, req.Ref.Driver, req.Ref.WorkspaceSlug)
@@ -195,6 +225,9 @@ func (s *Server) handleUpgrade(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "invalid_request", err.Error(), false)
 		return
 	}
+	if !s.checkGate(w, req.Ref.WorkspaceSlug, req.Ref.Driver) {
+		return
+	}
 	inv := s.beginInvocation(r.Context(), agent.VerbUpgrade, req.Ref.WorkspaceSlug, req.Ref.Driver, req.Ref.WorkspaceSlug)
 	ref, err := s.drv.Upgrade(r.Context(), req.Ref, req.Profile)
 	s.finishInvocation(inv, err)
@@ -209,6 +242,9 @@ func (s *Server) handleTeardown(w http.ResponseWriter, r *http.Request) {
 	var req TeardownReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, 400, "invalid_request", err.Error(), false)
+		return
+	}
+	if !s.checkGate(w, req.Ref.WorkspaceSlug, req.Ref.Driver) {
 		return
 	}
 	inv := s.beginInvocation(r.Context(), agent.VerbTeardown, req.Ref.WorkspaceSlug, req.Ref.Driver, req.Ref.WorkspaceSlug)
