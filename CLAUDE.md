@@ -109,7 +109,27 @@ Emitter env knobs:
 
 Emit is non-blocking (each Emit fires a goroutine bounded by the timeout) and best-effort: transport errors + non-2xx responses log at `slog.Warn` and are dropped. A hatch outage must never fault an RPC. Nop is the default so pre-5d hearth deployments emit nothing until an operator opts in via env.
 
-Phase 5d re-eval: when the console SS-08 wrapper (`console/src/lib/hearth/`) lands, decide whether to also emit console-side (double-emit is idempotent on `agent_id`) or flip a flag to prefer the console emit. Phase 7c hardens the driver `Teardown` verb to `approval.required: true` with `airlock_verb: agent.teardown` — deferred here.
+Phase 5d re-eval: when the console SS-08 wrapper (`console/src/lib/hearth/`) lands, decide whether to also emit console-side (double-emit is idempotent on `agent_id`) or flip a flag to prefer the console emit. `Teardown` verb hardening (`approval.required: true` + `airlock_verb: agent.teardown`) still deferred; awaits the airlock signed-token contract in Phase 7c-c-c so the gate has a real approval source.
+
+## Phase 7c-c-a-hearth — producer-side gate (Go port)
+
+Ports the console-side gate seams to hearth Go per rocky-hq decision `2026-06-29-phase-7c-c-a-close.md`. Two helpers + one composed gate + wiring in the RPC server. Env-driven stubs today; real Polar SDK lands in 7c-c-b, real airlock `agent.approve` verb lands in 7c-c-c.
+
+- `internal/agent/entitlement.go` — `CheckPolarEntitlement(EntitlementInput) EntitlementResult`. Reads `ROCKY_POLAR_TIER_<SLUG>` (default `solo`; unknown strings floor to `solo` — conservative — misconfigured env MUST NOT silently grant a higher tier). Reads `ROCKY_POLAR_SEATS_<SLUG>` (default `1`; non-numeric or negative floor to default). Tier order `solo < team < fleet < enterprise`. Deny reasons match the console verbiage: `tier below floor (<current> < <floor>)` / `insufficient seats (<current> < <required>)`.
+- `internal/agent/approval.go` — `CheckAirlockApproval(ApprovalInput) ApprovalResult`. Short-circuits to `Approved: true` when `RequiresApproval: false`. Otherwise reads `ROCKY_AGENT_APPROVED_<AGENT_ID>` (`1` or `true` → approved; else deny with `pending airlock <verb>` where verb defaults to `agent.approve`).
+- `internal/agent/gate.go` — `GateInvocation(registration, workspaceSlug) GateResult`. Composed: approval first (403 on deny), entitlement second (402 on deny). Mirrors console `gateAgentInvocation` semantics.
+- `internal/server/server.go` (`checkGate` helper wired into all four handlers): gate runs AFTER JSON decode and BEFORE `beginInvocation` + driver call. Denial writes `ErrorResp{Code, Message, Retryable:false}` with `code = "approval_denied"` or `"entitlement_denied"`. Denied paths never touch the driver and emit no `agent.*` events — a denied invocation is a non-event on the projection (mirrors the console 7c-c-a §Locked decision 3 invariant).
+- Parity rule: empty slug ⇒ no owner ⇒ no gate (same rule that skips agent emission in `beginInvocation`). Kept identical to console `x-rocky-workspace` header gating.
+
+Env keys (identical to console side):
+
+| Var pattern | Default | Notes |
+|---|---|---|
+| `ROCKY_POLAR_TIER_<SLUG>` | `solo` | Uppercase slug; hyphens → underscores. Unknown values floor to `solo`. |
+| `ROCKY_POLAR_SEATS_<SLUG>` | `1` | Non-numeric / negative floor to default. |
+| `ROCKY_AGENT_APPROVED_<AGENT_ID>` | (unset ⇒ deny) | Only consulted when the registration declares `approval.required: true`. |
+
+Deferred: real Polar SDK (7c-c-b, external repo) swaps `CheckPolarEntitlement` body; real airlock signed-token verification (7c-c-c, external) swaps `CheckAirlockApproval` body AND upgrades the `HTTPEmitter`'s current `x-rocky-user-role: operator` header to a signed cross-service token.
 
 ## CI secret: `ROCKY_HQ_RO_TOKEN`
 

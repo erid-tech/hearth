@@ -1,6 +1,10 @@
 # Go
 *.test
 *.out
+
+# Local go workspace (developer machine only; references sibling paths)
+go.work
+go.work.sum
 /dist/
 /bin/
 /coverage.out
