@@ -12,6 +12,7 @@ import (
 
 	dockerclient "github.com/docker/docker/client"
 
+	"github.com/rocky-hq/hearth/internal/agent"
 	"github.com/rocky-hq/hearth/internal/driver"
 	"github.com/rocky-hq/hearth/internal/driver/fake"
 	"github.com/rocky-hq/hearth/internal/driver/localdocker"
@@ -54,11 +55,13 @@ func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	agentEmitter := agent.EmitterFromEnv()
 	emitLog("startup", map[string]any{
-		"driver": drvName,
-		"socket": sockPath,
+		"driver":          drvName,
+		"socket":          sockPath,
+		"agent_hatch_url": os.Getenv(agent.EnvHatchURL),
 	})
-	if err := server.Listen(ctx, sockPath, server.New(d).Mux()); err != nil {
+	if err := server.Listen(ctx, sockPath, server.New(d).WithEmitter(agentEmitter).Mux()); err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
 	emitLog("shutdown", map[string]any{"socket": sockPath})
