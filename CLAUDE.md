@@ -4,7 +4,7 @@ Per the parent superproject's push-down policy (rocky-hq decision 2026-05-02-red
 
 ## What hearth is
 
-The Go submodule implementing the per-workspace CAIRNET+LORE provisioner from `rocky-hq/docs/specs/2026-05-02-rocky-system-redesign.md` §SS-08. Surface: the four-method `Driver` interface in `internal/driver/driver.go`. Phase 5a ships the interface + `FakeDriver`; Phase 5c ships `LocalDocker`; Phases 6a/6b ship `Kustomize` and `DevarnoCloud`.
+The Go submodule implementing the per-workspace CAIRNET+LORE provisioner from `rocky-hq/docs/specs/2026-05-02-rocky-system-redesign.md` §SS-08. Surface: the four-method `Driver` interface in `internal/driver/driver.go`. Phase 5a ships the interface + `FakeDriver`; Phase 5c ships `LocalDocker`; Phase 6a ships `Kustomize` (emit-only manifests); Phase 6b ships `DevarnoCloud`.
 
 ## Build
 
@@ -73,11 +73,12 @@ Env knobs:
 
 | Var | Default | Notes |
 |---|---|---|
-| `ROCKY_HEARTH_DRIVER` | `local-docker` | Also accepts `fake` for smoke tests. |
+| `ROCKY_HEARTH_DRIVER` | `local-docker` | Also accepts `fake` for smoke tests and `kustomize` (Phase 6a). |
 | `ROCKY_HEARTH_SOCKET` | `/var/run/rocky-hearth.sock` | Mode 0600. Removed on clean exit. |
 | `DOCKER_HOST` | (docker SDK default) | Passed through to the docker client. |
 | `ROCKY_HEARTH_IMAGE_CAIRNET` | `nginx:alpine` | Stand-in until CAIRNET image ships. |
 | `ROCKY_HEARTH_IMAGE_LORE` | `nginx:alpine` | Stand-in until LORE image ships. |
+| `ROCKY_HEARTH_KUSTOMIZE_OUTDIR` | `/var/lib/rocky-hearth/manifests` | Kustomize driver only. Per-workspace emit root. Must be writable. |
 
 Quick smoke test:
 
