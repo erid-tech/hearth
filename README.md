@@ -2,7 +2,7 @@
 
 Per-workspace CAIRNET+LORE provisioner for the [Rocky](https://github.com/rocky-hq) superproject.
 
-> **Status:** Phase 5c — `LocalDocker` driver + JSON-over-HTTP RPC. The `Driver` interface, `FakeDriver`, and `LocalDocker` are in place; `Kustomize` and `DevarnoCloud` land in Phases 6a/6b.
+> **Status:** Phase 6a — `Kustomize` driver landed alongside `LocalDocker`. The `Driver` interface, `FakeDriver`, `LocalDocker`, and `Kustomize` (emit-only manifests) are in place; `DevarnoCloud` lands in Phase 6b.
 
 ## Running locally
 

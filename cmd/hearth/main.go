@@ -15,6 +15,7 @@ import (
 	"github.com/rocky-hq/hearth/internal/agent"
 	"github.com/rocky-hq/hearth/internal/driver"
 	"github.com/rocky-hq/hearth/internal/driver/fake"
+	"github.com/rocky-hq/hearth/internal/driver/kustomize"
 	"github.com/rocky-hq/hearth/internal/driver/localdocker"
 	"github.com/rocky-hq/hearth/internal/server"
 )
@@ -48,8 +49,18 @@ func run() error {
 			return fmt.Errorf("localdocker driver: %w", err)
 		}
 		d = ld
+	case "kustomize":
+		km, err := kustomize.New(kustomize.Options{
+			Outdir:              envDefault("ROCKY_HEARTH_KUSTOMIZE_OUTDIR", "/var/lib/rocky-hearth/manifests"),
+			DefaultCairnetImage: envDefault("ROCKY_HEARTH_IMAGE_CAIRNET", "nginx:alpine"),
+			DefaultLoreImage:    envDefault("ROCKY_HEARTH_IMAGE_LORE", "nginx:alpine"),
+		})
+		if err != nil {
+			return fmt.Errorf("kustomize driver: %w", err)
+		}
+		d = km
 	default:
-		return fmt.Errorf("unknown ROCKY_HEARTH_DRIVER=%q (want fake|local-docker)", drvName)
+		return fmt.Errorf("unknown ROCKY_HEARTH_DRIVER=%q (want fake|local-docker|kustomize)", drvName)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
