@@ -146,7 +146,7 @@ type AgentRunEnd struct {
 // EmitRunStart / EmitRunEnd are fire-and-forget. Nil receiver is a
 // no-op. Empty workspaceSlug also skips (mirrors the console + ralph
 // rule — no owner, no tenancy, no emission).
-func (e *KAHNEmitter) EmitRunStart(ctx context.Context, workspaceSlug, agentID, runID, task string) {
+func (e *KAHNEmitter) EmitRunStart(_ context.Context, workspaceSlug, agentID, runID, task string) {
 	if e == nil || workspaceSlug == "" {
 		return
 	}
@@ -160,7 +160,7 @@ func (e *KAHNEmitter) EmitRunStart(ctx context.Context, workspaceSlug, agentID, 
 	e.dispatch(workspaceSlug, ev)
 }
 
-func (e *KAHNEmitter) EmitRunEnd(ctx context.Context, workspaceSlug, agentID, runID, outcome string, durationS float64) {
+func (e *KAHNEmitter) EmitRunEnd(_ context.Context, workspaceSlug, agentID, runID, outcome string, durationS float64) {
 	if e == nil || workspaceSlug == "" {
 		return
 	}
@@ -243,9 +243,9 @@ func kahnEventMeta(ev any) kahnMeta {
 	}
 }
 
-func truncateForKAHN(s string, max int) string {
-	if len(s) <= max {
+func truncateForKAHN(s string, maxLen int) string {
+	if len(s) <= maxLen {
 		return s
 	}
-	return s[:max]
+	return s[:maxLen]
 }
