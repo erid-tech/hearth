@@ -21,6 +21,11 @@ import (
 type Server struct {
 	drv  driver.Driver
 	emit agent.Emitter
+	// kahn is the P1a-4 KAHN-Cloud shipper. Nil means the operator
+	// has not opted the deployment into KAHN Scope emission (unset
+	// KAHN_INGEST_URL). Sibling to emit — different wire shape,
+	// different endpoint. Both are best-effort.
+	kahn *agent.KAHNEmitter
 }
 
 func New(d driver.Driver) *Server { return &Server{drv: d, emit: agent.NopEmitter{}} }
@@ -33,6 +38,13 @@ func (s *Server) WithEmitter(e agent.Emitter) *Server {
 	} else {
 		s.emit = e
 	}
+	return s
+}
+
+// WithKAHNEmitter returns s with its KAHN emitter replaced. Nil is
+// permitted and means no KAHN Scope emission.
+func (s *Server) WithKAHNEmitter(k *agent.KAHNEmitter) *Server {
+	s.kahn = k
 	return s
 }
 
@@ -125,6 +137,11 @@ func (s *Server) beginInvocation(ctx context.Context, verb agent.Verb, slug stri
 		Capability:     &capability,
 		RequestSummary: &summary,
 	})
+	// KAHN Scope projection: one agent_run_start per RPC verb call.
+	// Nil emitter or empty slug → no-op (guarded inside EmitRunStart).
+	// run_id = invocation uuid so the KAHN run correlates 1:1 with the
+	// hatch triple sibling.
+	s.kahn.EmitRunStart(ctx, slug, inv.agentID, inv.invocationID, string(verb))
 	return inv
 }
 
@@ -172,6 +189,15 @@ func (s *Server) finishInvocation(inv *agentInvocation, err error) {
 		Outcome:      &outcome,
 		DurationMS:   &dur,
 	})
+	// KAHN Scope projection: one agent_run_end per RPC verb call.
+	// KAHN outcome mapping mirrors ralph + console: ok → converged,
+	// error → aborted.
+	kahnOutcome := "converged"
+	if err != nil {
+		kahnOutcome = "aborted"
+	}
+	durationS := time.Since(inv.startAt).Seconds()
+	s.kahn.EmitRunEnd(inv.ctx, inv.slug, inv.agentID, inv.invocationID, kahnOutcome, durationS)
 }
 
 func truncate(s string, n int) string {
