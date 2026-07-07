@@ -112,6 +112,25 @@ Emit is non-blocking (each Emit fires a goroutine bounded by the timeout) and be
 
 Phase 5d re-eval: when the console SS-08 wrapper (`console/src/lib/hearth/`) lands, decide whether to also emit console-side (double-emit is idempotent on `agent_id`) or flip a flag to prefer the console emit. `Teardown` verb hardening (`approval.required: true` + `airlock_verb: agent.teardown`) still deferred; awaits the airlock signed-token contract in Phase 7c-c-c so the gate has a real approval source.
 
+## Phase P1a-4 — KAHN Scope shipper (sibling to hatch emit)
+
+Sibling producer, different endpoint + wire shape. Where the hatch emitter above ships `agent-registration.v1` events to the console SS-08 wrapper, `KAHNEmitter` (`internal/agent/kahn_emitter.go`) ships KAHN Scope's `agent_run_start` + `agent_run_end` per RPC verb call to KAHN Cloud directly. Both fire on the same invocation; both are best-effort and fail-open.
+
+- One KAHN run per RPC verb invocation. HEARTH has no substep grain to project (the driver call is atomic from the server's POV), so `total_steps = total_tool_calls = total_audit_checkpoints = 0` on every `agent_run_end`.
+- `agent_id` mirrors the hatch triple (`<workspace_slug>-driver-<driver-name>`). `run_id = invocation_id` (RPC uuid) so KAHN Scope's per-run view aligns 1:1 with the sibling `agent.registered/invoked/completed` triple.
+- Outcome map: RPC returns nil err → `converged`; error → `aborted`. Denied by the 7c-c-a gate → no emit at all (mirrors the hatch rule; a denied invocation is a non-event on the projection).
+- Empty workspace slug → no emit (parity with the hatch rule and console `x-rocky-workspace` gating).
+
+**Per-workspace tenancy.** Same convention as console (P1a-3b) and ralph (P1a-3c): `KAHN_INGEST_TOKEN_<SLUG_UPPER>` (slug uppercased, `-`/`.` → `_`) resolved first, `KAHN_INGEST_TOKEN` global fallback. Neither set → skip ship entirely (KAHN 401s on missing Bearer). `SlugTokenEnvKey(slug)` exported for provisioning tooling.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `KAHN_INGEST_URL` | *(unset = off)* | Base URL of KAHN agent-transition ingest. Unset → `KAHNEmitterFromEnv` returns nil; server no-ops on every KAHN emit call. |
+| `KAHN_INGEST_TOKEN_<SLUG_UPPER>` | *(unset)* | Per-workspace Bearer (`kahn_live_sk_<prefix>_<secret>`). Takes precedence over the global fallback. |
+| `KAHN_INGEST_TOKEN` | *(unset)* | Global Bearer fallback. Both unset → skip ship. |
+| `KAHN_INGEST_TIMEOUT_S` | `5.0` | Per-event HTTP timeout. |
+| `KAHN_DEBUG` | *(unset)* | `1` → log ship completions + no-token-resolved skips at `slog.Info`. |
+
 ## Phase 7c-c-a-hearth — producer-side gate (Go port)
 
 Ports the console-side gate seams to hearth Go per rocky-hq decision `2026-06-29-phase-7c-c-a-close.md`. Two helpers + one composed gate + wiring in the RPC server. Env-driven stubs today; real Polar SDK lands in 7c-c-b, real airlock `agent.approve` verb lands in 7c-c-c.

@@ -67,12 +67,15 @@ func run() error {
 	defer cancel()
 
 	agentEmitter := agent.EmitterFromEnv()
+	kahnEmitter := agent.KAHNEmitterFromEnv()
 	emitLog("startup", map[string]any{
 		"driver":          drvName,
 		"socket":          sockPath,
 		"agent_hatch_url": os.Getenv(agent.EnvHatchURL),
+		"kahn_ingest_url": os.Getenv(agent.EnvKAHNIngestURL),
 	})
-	if err := server.Listen(ctx, sockPath, server.New(d).WithEmitter(agentEmitter).Mux()); err != nil {
+	srv := server.New(d).WithEmitter(agentEmitter).WithKAHNEmitter(kahnEmitter)
+	if err := server.Listen(ctx, sockPath, srv.Mux()); err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
 	emitLog("shutdown", map[string]any{"socket": sockPath})
