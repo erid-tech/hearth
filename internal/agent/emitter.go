@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
 )
 
 // Emitter is the producer-side sink for AgentHatchEvent values.

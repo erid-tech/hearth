@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
 
-	"github.com/rocky-hq/hearth/internal/agent"
+	"github.com/erid-tech/hearth/internal/agent"
 )
 
 func TestNopEmitter_Silent(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	dockerclient "github.com/docker/docker/client"
 
-	"github.com/rocky-hq/hearth/internal/driver/localdocker"
+	"github.com/erid-tech/hearth/internal/driver/localdocker"
 )
 
 // requireIntegration skips a test unless ROCKY_HEARTH_INTEGRATION=1.

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
 )
 
 // tierRank encodes the spec's ordered ladder for

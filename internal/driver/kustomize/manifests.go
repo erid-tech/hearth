@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rocky-hq/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver"
 )
 
 const (

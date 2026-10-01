@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rocky-hq/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver"
 )
 
 // FakeDriver is a deterministic, in-memory driver.Driver.

@@ -38,7 +38,7 @@ go mod tidy && git diff --exit-code go.mod go.sum
 ## Conventions
 
 Locked in `rocky-hq/docs/decisions/2026-05-03-phase-5-go-conventions.md`:
-- Module: `github.com/rocky-hq/hearth`
+- Module: `github.com/erid-tech/hearth`
 - License: MIT
 - Go: 1.25
 - Layout: `cmd/` (entrypoints — Phase 5c+), `internal/` (private packages), `test/integration/` (gated)
@@ -52,7 +52,7 @@ The Phase 5 spec §6 shapes (`Tier`, `DriverName`, `Status`, `ResourceCaps`,
 `ProvisioningProfile`, `DeploymentRef`, `HearthHatchEvent`) are NOT
 defined in this repo. They are generated from the zod source in
 `@rocky-hq/contracts/src/hearth/` and imported as Go bindings from
-`github.com/rocky-hq/contracts/go/hearth`. The re-exports under
+`github.com/erid-tech/contracts/go/hearth`. The re-exports under
 `package driver` (`internal/driver/types.go`) are a thin convenience layer.
 `internal/driver/types_local.go` was removed in Phase 5b — it no longer exists.
 
@@ -60,7 +60,7 @@ defined in this repo. They are generated from the zod source in
 
 1. Edit the zod schema in `contracts/src/hearth/`.
 2. Bump the contracts package version and tag (both `vX.Y.Z` and `go/vX.Y.Z`).
-3. `go get github.com/rocky-hq/contracts/go@<new-tag>` here.
+3. `go get github.com/erid-tech/contracts/go@<new-tag>` here.
 
 Never edit `internal/driver/types.go` to introduce a new shape.
 
@@ -94,7 +94,7 @@ bearer tokens lands in Phase 6.
 ## SS-08 driver agent projection (Phase 7b)
 
 The RPC server (`internal/server/server.go`) emits `agent.{registered,invoked,completed}` per
-`agent-registration.v1` (contracts `>=0.3.0`, subpath `github.com/rocky-hq/contracts/go/agent`)
+`agent-registration.v1` (contracts `>=0.3.0`, subpath `github.com/erid-tech/contracts/go/agent`)
 per RPC verb call. Builders live in `internal/agent/`; the emitter is
 hearth-native (POSTs to `$HEARTH_AGENT_HATCH_URL`) because the console
 SS-08 wrapper (Phase 5d) that would otherwise own the emit is not built yet.
@@ -153,15 +153,15 @@ Deferred: real Polar SDK (7c-c-b, external repo) swaps `CheckPolarEntitlement` b
 
 ## CI secret: `ROCKY_HQ_RO_TOKEN`
 
-`rocky-hq/contracts` is a private repo. The `lint`, `test`, and `integration`
-CI jobs in `.github/workflows/ci.yml` configure `GOPRIVATE=github.com/rocky-hq/*`
+`erid-tech/contracts` is a private repo. The `lint`, `test`, and `integration`
+CI jobs in `.github/workflows/ci.yml` configure `GOPRIVATE=github.com/erid-tech/*`
 and authenticate `go mod download` using a fine-grained PAT stored as the
 org-level GitHub Actions secret **`ROCKY_HQ_RO_TOKEN`**.
 
 If you are setting up a fresh CI runner or forking this repo:
 
 - Create a fine-grained PAT with **read-only Contents** scope on
-  `rocky-hq/contracts` (and any future private rocky-hq Go modules hearth
+  `erid-tech/contracts` (and any future private erid-tech Go modules hearth
   might depend on).
 - Store it as an org-level (or repo-level) GitHub Actions secret named
   `ROCKY_HQ_RO_TOKEN`.

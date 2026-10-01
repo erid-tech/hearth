@@ -21,7 +21,7 @@ linters-settings:
   gocyclo:
     min-complexity: 15
   goimports:
-    local-prefixes: github.com/rocky-hq/hearth
+    local-prefixes: github.com/erid-tech/hearth
   misspell:
     locale: US
   depguard:

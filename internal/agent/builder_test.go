@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
-	contractshearth "github.com/rocky-hq/contracts/go/hearth"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
+	contractshearth "github.com/erid-tech/contracts/go/hearth"
 
-	"github.com/rocky-hq/hearth/internal/agent"
+	"github.com/erid-tech/hearth/internal/agent"
 )
 
 var agentIDRE = regexp.MustCompile(`^[a-z][a-z0-9-]*-(council|sniffer|stratt|ralph|relay|driver)-[a-z0-9-]+$`)

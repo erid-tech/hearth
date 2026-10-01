@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rocky-hq/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver"
 )
 
 func TestWireRoundTrip(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
-	contractshearth "github.com/rocky-hq/contracts/go/hearth"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
+	contractshearth "github.com/erid-tech/contracts/go/hearth"
 )
 
 func regWithOverrides(t *testing.T, mutate func(*contractsagent.AgentRegistration)) contractsagent.AgentRegistration {

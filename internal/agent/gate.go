@@ -3,7 +3,7 @@ package agent
 import (
 	"net/http"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
 )
 
 // GateResult composes the approval + entitlement checks per

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rocky-hq/hearth/internal/driver"
-	"github.com/rocky-hq/hearth/internal/server"
+	"github.com/erid-tech/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/server"
 )
 
 // TestRPCEndToEnd builds cmd/hearth, launches it pointed at a temp

@@ -6,9 +6,9 @@ on:
   push:
     branches: [main]
 
-# `github.com/rocky-hq/contracts/go` is a private Go module — the public
+# `github.com/erid-tech/contracts/go` is a private Go module — the public
 # Go module proxy cannot resolve it. GOPRIVATE tells `go get` to bypass
-# the proxy/sumdb for rocky-hq paths; each job that runs `go mod` /
+# the proxy/sumdb for erid-tech paths; each job that runs `go mod` /
 # `go build` then configures git with a read-only PAT (org secret
 # ROCKY_HQ_RO_TOKEN) so the direct git fetch authenticates.
 #
@@ -17,7 +17,7 @@ on:
 # contracts private (see rocky-hq/rocky Phase 5b plan §"Contracts
 # visibility decision").
 env:
-  GOPRIVATE: github.com/rocky-hq/*
+  GOPRIVATE: github.com/erid-tech/*
 
 jobs:
   lint:
@@ -28,9 +28,9 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
-      - name: Authenticate to rocky-hq private Go modules
+      - name: Authenticate to erid-tech private Go modules
         run: |
-          git config --global url."https://x-access-token:${{ secrets.ROCKY_HQ_RO_TOKEN }}@github.com/rocky-hq/".insteadOf "https://github.com/rocky-hq/"
+          git config --global url."https://x-access-token:${{ secrets.ROCKY_HQ_RO_TOKEN }}@github.com/erid-tech/".insteadOf "https://github.com/erid-tech/"
       - name: Install gofumpt
         run: go install mvdan.cc/gofumpt@latest
       - name: gofumpt
@@ -62,9 +62,9 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
-      - name: Authenticate to rocky-hq private Go modules
+      - name: Authenticate to erid-tech private Go modules
         run: |
-          git config --global url."https://x-access-token:${{ secrets.ROCKY_HQ_RO_TOKEN }}@github.com/rocky-hq/".insteadOf "https://github.com/rocky-hq/"
+          git config --global url."https://x-access-token:${{ secrets.ROCKY_HQ_RO_TOKEN }}@github.com/erid-tech/".insteadOf "https://github.com/erid-tech/"
       - run: go build ./...
       - run: go test ./... -race -count=1
 
@@ -80,9 +80,9 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
-      - name: Authenticate to rocky-hq private Go modules
+      - name: Authenticate to erid-tech private Go modules
         run: |
-          git config --global url."https://x-access-token:${{ secrets.ROCKY_HQ_RO_TOKEN }}@github.com/rocky-hq/".insteadOf "https://github.com/rocky-hq/"
+          git config --global url."https://x-access-token:${{ secrets.ROCKY_HQ_RO_TOKEN }}@github.com/erid-tech/".insteadOf "https://github.com/erid-tech/"
       - name: Verify Docker daemon
         run: docker version
       - name: Pre-pull nginx:alpine

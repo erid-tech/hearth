@@ -10,12 +10,12 @@ import (
 	"net/http"
 	"time"
 
+	contractsagent "github.com/erid-tech/contracts/go/agent"
+	contractshearth "github.com/erid-tech/contracts/go/hearth"
 	"github.com/google/uuid"
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
-	contractshearth "github.com/rocky-hq/contracts/go/hearth"
 
-	"github.com/rocky-hq/hearth/internal/agent"
-	"github.com/rocky-hq/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/agent"
+	"github.com/erid-tech/hearth/internal/driver"
 )
 
 type Server struct {

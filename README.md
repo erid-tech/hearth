@@ -25,8 +25,8 @@ in [`CLAUDE.md`](./CLAUDE.md#running-locally-phase-5c).
 ```go
 import (
     "context"
-    "github.com/rocky-hq/hearth/internal/driver"
-    "github.com/rocky-hq/hearth/internal/driver/fake"
+    "github.com/erid-tech/hearth/internal/driver"
+    "github.com/erid-tech/hearth/internal/driver/fake"
 )
 
 d := fake.New()

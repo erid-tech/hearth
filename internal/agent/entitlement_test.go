@@ -3,7 +3,7 @@ package agent
 import (
 	"testing"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
 )
 
 func TestPolarEntitlement_DefaultSoloAllowsSoloFloor(t *testing.T) {

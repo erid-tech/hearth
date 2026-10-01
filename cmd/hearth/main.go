@@ -12,12 +12,12 @@ import (
 
 	dockerclient "github.com/docker/docker/client"
 
-	"github.com/rocky-hq/hearth/internal/agent"
-	"github.com/rocky-hq/hearth/internal/driver"
-	"github.com/rocky-hq/hearth/internal/driver/fake"
-	"github.com/rocky-hq/hearth/internal/driver/kustomize"
-	"github.com/rocky-hq/hearth/internal/driver/localdocker"
-	"github.com/rocky-hq/hearth/internal/server"
+	"github.com/erid-tech/hearth/internal/agent"
+	"github.com/erid-tech/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver/fake"
+	"github.com/erid-tech/hearth/internal/driver/kustomize"
+	"github.com/erid-tech/hearth/internal/driver/localdocker"
+	"github.com/erid-tech/hearth/internal/server"
 )
 
 func main() {
