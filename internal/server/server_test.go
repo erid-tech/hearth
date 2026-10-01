@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rocky-hq/hearth/internal/driver"
-	"github.com/rocky-hq/hearth/internal/driver/fake"
+	"github.com/erid-tech/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver/fake"
 )
 
 func newTestServer(t *testing.T) (*httptest.Server, *fake.FakeDriver) {

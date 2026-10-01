@@ -9,11 +9,11 @@ import (
 	"sync"
 	"testing"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
 
-	"github.com/rocky-hq/hearth/internal/agent"
-	"github.com/rocky-hq/hearth/internal/driver"
-	"github.com/rocky-hq/hearth/internal/driver/fake"
+	"github.com/erid-tech/hearth/internal/agent"
+	"github.com/erid-tech/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver/fake"
 )
 
 // recordingEmitter is a synchronous test double for agent.Emitter.

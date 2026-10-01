@@ -7,8 +7,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 
-	"github.com/rocky-hq/hearth/internal/driver"
-	"github.com/rocky-hq/hearth/internal/driver/localdocker"
+	"github.com/erid-tech/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver/localdocker"
 )
 
 func soloProfile() driver.ProvisioningProfile {

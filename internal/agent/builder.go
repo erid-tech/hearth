@@ -2,7 +2,7 @@
 // agent-registration.v1 HATCH projection (Phase 7b, hearth driver slice).
 //
 // Wire format: contracts/src/agent (zod source), consumed via
-// github.com/rocky-hq/contracts/go/agent bindings. See
+// github.com/erid-tech/contracts/go/agent bindings. See
 // docs/decisions/2026-06-29-phase-7b-driver-close.md (in the parent
 // superproject) for the shape lockdown.
 package agent
@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	contractsagent "github.com/rocky-hq/contracts/go/agent"
-	contractshearth "github.com/rocky-hq/contracts/go/hearth"
+	contractsagent "github.com/erid-tech/contracts/go/agent"
+	contractshearth "github.com/erid-tech/contracts/go/hearth"
 )
 
 // Capabilities is the fixed set of verbs registered for every hearth

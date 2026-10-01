@@ -12,7 +12,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 
-	"github.com/rocky-hq/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver"
 )
 
 // ErrTierMismatch is returned when Provision is called for a workspace

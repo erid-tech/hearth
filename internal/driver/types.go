@@ -2,14 +2,14 @@ package driver
 
 // The hearth driver protocol shapes are defined canonically as zod
 // schemas in @rocky-hq/contracts/src/hearth/ and consumed in Go via the
-// generated bindings at github.com/rocky-hq/contracts/go/hearth.
+// generated bindings at github.com/erid-tech/contracts/go/hearth.
 //
 // This file re-exports the generated types and named constants under
 // `package driver` so the rest of hearth (driver.go, fake/, future
 // localdocker/) keeps the short names `Tier`, `DeploymentRef`, etc.
 // DO NOT add new types here; extend the zod source.
 
-import contractshearth "github.com/rocky-hq/contracts/go/hearth"
+import contractshearth "github.com/erid-tech/contracts/go/hearth"
 
 // Generated type re-exports (Phase 5 spec §6).
 type (

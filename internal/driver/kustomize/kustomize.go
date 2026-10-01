@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/rocky-hq/hearth/internal/driver"
+	"github.com/erid-tech/hearth/internal/driver"
 )
 
 // ErrTierMismatch mirrors LocalDocker: Provision on an existing workspace
